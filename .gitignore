@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Models (large binary files)
+models/*.pkl
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
