@@ -8,4 +8,10 @@ const api = axios.create({
 export const predictEarthquake = (data) =>
   api.post("/predict/earthquake", data);
 
+export const predictFlood = (data) =>
+  api.post("/predict/flood", data);
+
+export const predictFloodQuick = (data) =>
+  api.post("/predict/flood/quick", data);
+
 export default api;

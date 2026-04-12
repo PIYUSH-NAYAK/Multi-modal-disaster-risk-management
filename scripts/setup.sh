@@ -69,7 +69,7 @@ fi
 step "2/6" "Setting up Python virtual environment"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+cd "$SCRIPT_DIR/.."  # Move to project root (script lives in scripts/)
 
 if [ -d "venv" ]; then
     ok "Virtual environment already exists — skipping creation"

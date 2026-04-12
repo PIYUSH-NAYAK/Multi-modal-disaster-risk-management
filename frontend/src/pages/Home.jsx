@@ -23,7 +23,7 @@ const disasters = [
     border: "border-blue-500/20 hover:border-blue-500/40",
     iconBg: "bg-blue-500/10",
     accent: "text-blue-400",
-    available: false,
+    available: true,
   },
   {
     type: "cyclone",
@@ -41,8 +41,8 @@ const disasters = [
 
 const stats = [
   { label: "Earthquake Records", value: "7,051", icon: "📊" },
-  { label: "Flood Records", value: "10,000", icon: "📈" },
-  { label: "ML Models", value: "3", icon: "🤖" },
+  { label: "Flood Records", value: "2,19,277", icon: "📈" },
+  { label: "ML Models", value: "5", icon: "🤖" },
 ];
 
 export default function Home() {

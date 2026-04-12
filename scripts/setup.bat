@@ -2,6 +2,9 @@
 setlocal EnableDelayedExpansion
 title DisasterAI Setup
 
+:: ── Navigate to project root (script lives in scripts\) ──────
+pushd "%~dp0.."
+
 :: ── Colors via PowerShell ────────────────────────────────────
 set "PS=powershell -NoProfile -Command"
 

@@ -44,7 +44,7 @@ Write-Host "   Setup Script (PowerShell)" -ForegroundColor Gray
 Write-Host "  =====================================================" -ForegroundColor Blue
 Write-Host ""
 
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)  # project root
 Set-Location $Root
 
 # ── Step 1 — Prerequisites ────────────────────────────────────
