@@ -12,6 +12,9 @@ AI-powered disaster risk prediction for India using real historical data and mac
   - Time-Series (daily rainfall deviation and monsoon patterns from 2,04,876 IMD records)
   - Geospatial (location, river basins, historical flood frequency)
 - **Quick Check** — Locals can check flood risk with just their state and month, no technical inputs needed
+- **Live Weather Auto-Fill** — Selects a city and auto-fetches real-time rainfall, humidity & river discharge via [Open-Meteo](https://open-meteo.com/) (free, no API key)
+- **Historical Climate Data** — For future/past months, fetches 10-year historical averages (2014–2023) instead of live data
+- **Live City Alerts** — Home page shows real-time weather + flood threat level for 10 major Indian cities
 - **Interactive Dashboard** — Risk gauge, modal breakdown cards, rainfall charts, river level bars, key factors, and recommendations
 
 ---
@@ -61,9 +64,19 @@ disaster/
 
 ---
 
-## Quick Start (Recommended)
+## Quick Start
 
-Run a single script — it checks prerequisites, creates the virtual environment, installs all dependencies, trains all ML models, and starts both servers.
+### One command — starts everything
+
+```bash
+npm run dev
+```
+
+This starts both the **backend** (FastAPI on port 8000) and the **frontend** (React on port 5173) in a single terminal with colour-coded output.
+
+Open `http://localhost:5173` in your browser.
+
+> **First time only** — run the setup script before using `npm run dev`:
 
 **Linux / macOS**
 ```bash
@@ -82,7 +95,7 @@ chmod +x scripts/setup.sh
 scripts\setup.bat
 ```
 
-The script is smart — it skips steps that are already done (won't retrain models or reinstall packages on subsequent runs).
+The setup script checks prerequisites, creates the Python virtual environment, installs all dependencies, and trains all ML models. It is smart — it skips steps that are already done on subsequent runs.
 
 ---
 
@@ -158,44 +171,44 @@ python train\train_flood_geo.py
 
 ---
 
-### 4. Start the backend
+### 4. Install root dependencies (one-time)
 
-Make sure the virtual environment is still active.
-
-**Linux / macOS**
 ```bash
-uvicorn backend.main:app --reload --port 8000
+npm install
 ```
 
-**Windows**
-```cmd
-uvicorn backend.main:app --reload --port 8000
-```
-
-The API will be available at `http://localhost:8000`.  
-Visit `http://localhost:8000/docs` to see the interactive Swagger UI.
+This installs `concurrently`, which powers the single `npm run dev` command.
 
 ---
 
-### 5. Start the frontend
+### 5. Install frontend dependencies (one-time)
 
-Open a **new terminal** (keep the backend running).
-
-**Linux / macOS**
 ```bash
-cd frontend
-npm install
+cd frontend && npm install && cd ..
+```
+
+---
+
+### 6. Start both servers
+
+```bash
 npm run dev
 ```
 
-**Windows**
-```cmd
-cd frontend
-npm install
-npm run dev
-```
+| Server | URL |
+|--------|-----|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
 
-Open `http://localhost:5173` in your browser.
+> To run servers separately, open two terminals:
+> ```bash
+> # Terminal 1 — backend
+> source venv/bin/activate && cd backend && uvicorn main:app --reload --port 8000
+>
+> # Terminal 2 — frontend
+> cd frontend && npm run dev
+> ```
 
 ---
 
@@ -207,6 +220,9 @@ Open `http://localhost:5173` in your browser.
 | POST | `/predict/earthquake` | Earthquake magnitude + risk level |
 | POST | `/predict/flood` | Flood risk — detailed (7 inputs, 3 modals) |
 | POST | `/predict/flood/quick` | Flood risk — simple (state + month only) |
+| GET | `/weather?lat&lon` | Live rainfall, humidity, temp & river discharge |
+| GET | `/climate?lat&lon&month` | 10-year historical monthly averages (2014–2023) |
+| GET | `/alerts` | Live weather + threat level for 10 major cities |
 | GET | `/model-info` | Model metadata and feature info |
 
 ### Example — Earthquake prediction
@@ -266,7 +282,10 @@ curl -X POST http://localhost:8000/predict/flood \
 
 > \* Time-series and geospatial labels were derived from the same features (threshold-based), so 100% accuracy is expected — the models learn the decision boundary, not noise. This is acceptable for a mini-project demo.
 
-**Flood fusion weights:** Hydro-Met 40% + Time-Series 40% + Geospatial 20%
+**Flood fusion:** `geo_base × seasonality ± tabular_adjustment`
+- Geographic base risk per state (overrides unreliable geo model outputs)
+- Seasonality lookup table built from real Indian flood calendar (24 states)
+- Tabular modal acts as a ±adjustment based on user-provided conditions
 
 ---
 
@@ -291,7 +310,10 @@ taskkill /PID <PID> /F
 Make sure the virtual environment is activated before running Python scripts.
 
 **Frontend shows "Something went wrong. Is the backend running?"**
-The backend must be running at `http://localhost:8000` before using the frontend. Start it with `uvicorn backend.main:app --reload --port 8000`.
+The backend must be running at `http://localhost:8000`. Use `npm run dev` from the project root to start both servers together.
+
+**Live weather auto-fill not working**
+Open-Meteo occasionally rate-limits rapid requests. The fields will stay empty — fill them manually. This only affects the current-month live fetch; historical months always work.
 
 ---
 

@@ -14,4 +14,13 @@ export const predictFlood = (data) =>
 export const predictFloodQuick = (data) =>
   api.post("/predict/flood/quick", data);
 
+export const fetchWeather = (lat, lon) =>
+  api.get("/weather", { params: { lat, lon } });
+
+export const fetchClimate = (lat, lon, month) =>
+  api.get("/climate", { params: { lat, lon, month } });
+
+export const fetchAlerts = () =>
+  api.get("/alerts");
+
 export default api;

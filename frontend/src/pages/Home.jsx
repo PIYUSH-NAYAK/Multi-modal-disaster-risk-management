@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import LiveAlerts from "../components/LiveAlerts";
 
 const disasters = [
   {
@@ -160,6 +161,9 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Live Alerts */}
+      <LiveAlerts />
 
       {/* Stats Section */}
       <section className="border-t border-white/[0.06] bg-white/[0.01]">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { predictEarthquake, predictFlood, predictFloodQuick } from "../api";
+import { predictEarthquake, predictFlood, predictFloodQuick, fetchWeather, fetchClimate } from "../api";
 import ResultCard from "../components/ResultCard";
 import FloodResult from "../components/FloodResult";
 import FloodQuickResult from "../components/FloodQuickResult";
@@ -50,12 +50,17 @@ function SelectField({ label, value, onChange, disabled, children, hint }) {
   );
 }
 
-function NumberField({ label, value, onChange, placeholder, min, max, step, hint }) {
+function NumberField({ label, value, onChange, placeholder, min, max, step, hint, optional }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-300 mb-1.5">
-        {label}
-        {hint && <span className="text-gray-600 font-normal ml-2 text-xs">{hint}</span>}
+      <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
+        <span className={optional ? "text-gray-500" : "text-gray-300"}>{label}</span>
+        {optional && (
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600 border border-white/[0.08] rounded px-1.5 py-0.5">
+            optional
+          </span>
+        )}
+        {hint && !optional && <span className="text-gray-600 font-normal ml-1 text-xs">{hint}</span>}
       </label>
       <input
         type="number"
@@ -65,8 +70,11 @@ function NumberField({ label, value, onChange, placeholder, min, max, step, hint
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        required
-        className="w-full bg-gray-900 border border-white/[0.08] text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 placeholder-gray-600 transition-all duration-200"
+        className={`w-full bg-gray-900 text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 placeholder-gray-600 transition-all duration-200 ${
+          optional
+            ? "border border-dashed border-white/[0.08] focus:border-indigo-500/30 focus:ring-indigo-500/10"
+            : "border border-white/[0.08] focus:border-indigo-500/50 focus:ring-indigo-500/20"
+        }`}
       />
     </div>
   );
@@ -221,6 +229,7 @@ function FloodQuickForm({ onResult, onLoading }) {
 
 function FloodDetailedForm({ onResult, onLoading }) {
   const [state, setState]           = useState("");
+  const [city, setCity]             = useState("");
   const [month, setMonth]           = useState("");
   const [rainfall, setRainfall]     = useState("");
   const [waterLevel, setWaterLevel] = useState("");
@@ -229,6 +238,35 @@ function FloodDetailedForm({ onResult, onLoading }) {
   const [landCover, setLandCover]   = useState("Agricultural");
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState(null);
+  const [weatherFetching, setWeatherFetching] = useState(false);
+  const [weatherBadge, setWeatherBadge]       = useState(null);
+
+  const cityList = state ? locations[state] : [];
+  const cityObj  = cityList.find((c) => c.city === city);
+
+  useEffect(() => { setCity(""); setWeatherBadge(null); }, [state]);
+
+  const currentMonth = new Date().getMonth() + 1;
+
+  useEffect(() => {
+    if (!cityObj || !month) return;
+    setWeatherFetching(true);
+    setWeatherBadge(null);
+    const isCurrentMonth = parseInt(month) === currentMonth;
+    const fetcher = isCurrentMonth
+      ? fetchWeather(cityObj.lat, cityObj.lon)
+      : fetchClimate(cityObj.lat, cityObj.lon, parseInt(month));
+    fetcher
+      .then((res) => {
+        const w = res.data;
+        setRainfall(String(w.rainfall_mm));
+        setHumidity(String(w.humidity));
+        setWaterLevel("");
+        setWeatherBadge(w);
+      })
+      .catch(() => setWeatherBadge(null))
+      .finally(() => setWeatherFetching(false));
+  }, [cityObj, month]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -239,7 +277,8 @@ function FloodDetailedForm({ onResult, onLoading }) {
     try {
       const res = await predictFlood({
         state, month: parseInt(month),
-        rainfall: parseFloat(rainfall), water_level: parseFloat(waterLevel),
+        rainfall: parseFloat(rainfall),
+        water_level: waterLevel !== "" ? parseFloat(waterLevel) : null,
         humidity: parseFloat(humidity), soil_type: soilType, land_cover: landCover,
       });
       onResult(res.data);
@@ -251,7 +290,7 @@ function FloodDetailedForm({ onResult, onLoading }) {
     }
   };
 
-  const valid = state && month && rainfall && waterLevel && humidity;
+  const valid = state && month && rainfall && humidity;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -265,11 +304,42 @@ function FloodDetailedForm({ onResult, onLoading }) {
           {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
         </SelectField>
       </div>
+
+      <SelectField label="City" value={city} onChange={(e) => setCity(e.target.value)} disabled={!state}>
+        <option value="">Select city to auto-fill weather…</option>
+        {cityList.map((c) => <option key={c.city} value={c.city}>{c.city}</option>)}
+      </SelectField>
+
+      {/* Live weather badge */}
+      {weatherFetching && (
+        <div className="flex items-center gap-2 text-xs text-indigo-400 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+          <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Fetching live weather…
+        </div>
+      )}
+      {weatherBadge && !weatherFetching && (
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs text-green-300">
+          <span>
+            {weatherBadge.source === "historical"
+              ? `Avg ${MONTHS[parseInt(month)-1]} data (${weatherBadge.years}) for ${city}`
+              : `Live data for ${city}`}
+          </span>
+          <span className="font-mono">
+            {weatherBadge.source === "historical"
+              ? `Avg ${weatherBadge.temperature}°C`
+              : `${weatherBadge.condition} · ${weatherBadge.temperature}°C`}
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
-        <NumberField label="Rainfall (mm)" value={rainfall} onChange={setRainfall} placeholder="e.g. 250" />
-        <NumberField label="Water Level (m)" value={waterLevel} onChange={setWaterLevel} placeholder="e.g. 5.5" />
+        <NumberField label="Rainfall (mm)" value={rainfall} onChange={setRainfall} placeholder="e.g. 250" hint={weatherBadge ? "auto-filled" : ""} />
+        <NumberField label="Water Level (m)" value={waterLevel} onChange={setWaterLevel} placeholder="e.g. 5.5" optional />
       </div>
-      <NumberField label="Humidity (%)" value={humidity} onChange={setHumidity} placeholder="e.g. 80" min="0" max="100" step="1" />
+      <NumberField label="Humidity (%)" value={humidity} onChange={setHumidity} placeholder="e.g. 80" min="0" max="100" step="1" hint={weatherBadge ? "auto-filled" : ""} />
       <div className="grid grid-cols-2 gap-3">
         <SelectField label="Soil Type" value={soilType} onChange={(e) => setSoilType(e.target.value)}>
           {SOIL_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -278,9 +348,6 @@ function FloodDetailedForm({ onResult, onLoading }) {
           {LAND_COVERS.map((l) => <option key={l} value={l}>{l}</option>)}
         </SelectField>
       </div>
-      <p className="text-xs text-gray-600">
-        Try: Assam + July + 285mm + 7m + 85% for an extreme-risk example.
-      </p>
       {error && <ErrorBox message={error} />}
       <SubmitButton valid={valid} loading={loading} label="Predict Flood Risk" />
     </form>
