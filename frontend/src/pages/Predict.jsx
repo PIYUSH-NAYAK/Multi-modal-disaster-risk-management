@@ -390,39 +390,71 @@ function FloodForm({ onResult, onLoading, onModeChange }) {
 
 // ── Empty state placeholder ───────────────────────────────────
 
+const EMPTY_STATE_INFO = {
+  earthquake: {
+    emoji: "🌋",
+    title: "Earthquake Magnitude Predictor",
+    desc: "Uses USGS India seismic data trained on 7,051 records. Predicts Richter magnitude based on location and depth.",
+    steps: [
+      { icon: "📍", label: "Location", text: "Select your state and city" },
+      { icon: "📏", label: "Depth",    text: "Enter focal depth in km (5–100 typical)" },
+      { icon: "🤖", label: "Result",   text: "Get predicted magnitude and risk classification" },
+    ],
+    tags: ["Random Forest Regressor", "R² = 0.356", "7,051 records"],
+    color: "from-orange-500/5 to-amber-500/5",
+    border: "border-orange-500/10",
+    accent: "text-orange-400",
+  },
+  flood: {
+    emoji: "🌊",
+    title: "Multi-Modal Flood Risk Predictor",
+    desc: "Fuses 3 independent ML models — Hydro-Met, Time-Series, and Geospatial — with live weather data from Open-Meteo.",
+    steps: [
+      { icon: "🗺️", label: "Location", text: "Pick your state, city and month" },
+      { icon: "🛰",  label: "Weather",  text: "Live or historical weather auto-fills the form" },
+      { icon: "📊",  label: "Result",   text: "See flood probability with multi-modal breakdown" },
+    ],
+    tags: ["3 RF Classifiers", "Late Fusion", "2.19L records"],
+    color: "from-blue-500/5 to-cyan-500/5",
+    border: "border-blue-500/10",
+    accent: "text-blue-400",
+  },
+};
+
 function EmptyState({ disaster }) {
-  const hints = {
-    earthquake: [
-      { icon: "📍", text: "Select your state and city" },
-      { icon: "📏", text: "Enter the estimated depth in km" },
-      { icon: "🤖", text: "Get predicted magnitude & risk level" },
-    ],
-    flood: [
-      { icon: "🗺️", text: "Pick your state and month" },
-      { icon: "📊", text: "AI analyses historical rainfall patterns" },
-      { icon: "⚠️", text: "See flood probability and what to do" },
-    ],
-  };
-  const steps = hints[disaster] || hints.earthquake;
+  const info = EMPTY_STATE_INFO[disaster] || EMPTY_STATE_INFO.earthquake;
 
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-12 py-20">
-      <div className="text-6xl mb-6 opacity-20">
-        {disaster === "earthquake" ? "🌋" : disaster === "flood" ? "🌊" : "🌀"}
+    <div className="h-full flex flex-col justify-center py-10 px-4 lg:px-8">
+      {/* Hero card */}
+      <div className={`rounded-2xl bg-gradient-to-br ${info.color} border ${info.border} p-8 mb-6 text-center`}>
+        <div className="text-7xl mb-5 opacity-50">{info.emoji}</div>
+        <h3 className="text-xl font-bold text-white mb-3">{info.title}</h3>
+        <p className="text-sm text-gray-500 leading-relaxed max-w-md mx-auto">{info.desc}</p>
+        <div className="flex flex-wrap justify-center gap-2 mt-5">
+          {info.tags.map((t) => (
+            <span key={t} className="text-[11px] font-medium px-2.5 py-1 rounded-full glass text-gray-400">
+              {t}
+            </span>
+          ))}
+        </div>
       </div>
-      <h3 className="text-lg font-semibold text-gray-400 mb-2">
-        Fill the form to get your prediction
-      </h3>
-      <p className="text-sm text-gray-600 mb-10 max-w-xs">
-        Results will appear here — including risk level, analysis charts, and recommendations.
-      </p>
-      <div className="space-y-4 w-full max-w-xs text-left">
-        {steps.map((s, i) => (
-          <div key={i} className="flex items-center gap-4">
+
+      {/* Steps */}
+      <div className="space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-600 mb-4 text-center">How to use</p>
+        {info.steps.map((s, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3 rounded-xl glass">
             <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-lg shrink-0">
               {s.icon}
             </div>
-            <p className="text-sm text-gray-500">{s.text}</p>
+            <div>
+              <p className={`text-[11px] font-semibold uppercase tracking-wider ${info.accent} mb-0.5`}>{s.label}</p>
+              <p className="text-sm text-gray-400">{s.text}</p>
+            </div>
+            <div className="ml-auto shrink-0 w-6 h-6 rounded-full bg-white/[0.04] flex items-center justify-center text-xs text-gray-600 font-bold">
+              {i + 1}
+            </div>
           </div>
         ))}
       </div>
@@ -454,18 +486,27 @@ export default function Predict() {
 
   return (
     <div className="relative min-h-[calc(100vh-64px)]">
-      <div className="absolute inset-0 bg-glow pointer-events-none" />
+      {/* Background */}
+      <div className="absolute inset-0 bg-grid opacity-30 pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[500px] h-[300px] bg-indigo-600/10 blur-[100px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-6 py-10">
         {/* Page header */}
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass text-xs font-medium text-gray-400 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-            AI-Powered Prediction
+        <div className="mb-8 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5 text-xs font-semibold text-indigo-300 mb-4">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-50" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-400" />
+            </span>
+            AI-Powered Risk Analysis
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
             Disaster Risk Predictor
           </h1>
+          <p className="text-gray-500 text-sm mt-2">
+            Select a disaster type, enter location details, and get an instant AI risk assessment.
+          </p>
         </div>
 
         {/* Two-column layout */}

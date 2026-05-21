@@ -23,4 +23,10 @@ export const fetchClimate = (lat, lon, month) =>
 export const fetchAlerts = () =>
   api.get("/alerts");
 
+export const geocodeCity = (name) =>
+  api.get("/geocode", { params: { name } });
+
+export const fetchCityWeather = (lat, lon, name, state) =>
+  api.get("/weather/city", { params: { lat, lon, name, state } });
+
 export default api;

@@ -64,4 +64,13 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Extra glow utilities */
+  .glow-indigo {
+    box-shadow: 0 0 60px -15px rgba(99, 102, 241, 0.3);
+  }
+
+  .glow-emerald {
+    box-shadow: 0 0 40px -10px rgba(52, 211, 153, 0.2);
+  }
 }

@@ -14,7 +14,7 @@ app = FastAPI(title="Disaster Risk Intelligence API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -655,24 +655,43 @@ async def get_climate_normals(lat: float, lon: float, month: int):
 
 
 ALERT_CITIES = [
-    {"name": "Patna",       "state": "Bihar",          "lat": 25.5941, "lon": 85.1376},
-    {"name": "Guwahati",    "state": "Assam",          "lat": 26.1445, "lon": 91.7362},
-    {"name": "Mumbai",      "state": "Maharashtra",    "lat": 19.0760, "lon": 72.8777},
-    {"name": "Kolkata",     "state": "West Bengal",    "lat": 22.5726, "lon": 88.3639},
-    {"name": "Chennai",     "state": "Tamil Nadu",     "lat": 13.0827, "lon": 80.2707},
-    {"name": "Bhubaneswar", "state": "Odisha",         "lat": 20.2961, "lon": 85.8245},
-    {"name": "Hyderabad",   "state": "Telangana",      "lat": 17.3850, "lon": 78.4867},
-    {"name": "Lucknow",     "state": "Uttar Pradesh",  "lat": 26.8467, "lon": 80.9462},
-    {"name": "Delhi",       "state": "Delhi",          "lat": 28.6139, "lon": 77.2090},
-    {"name": "Kochi",       "state": "Kerala",         "lat": 9.9312,  "lon": 76.2673},
+    {"name": "Patna",            "state": "Bihar",             "lat": 25.5941, "lon": 85.1376},
+    {"name": "Guwahati",         "state": "Assam",             "lat": 26.1445, "lon": 91.7362},
+    {"name": "Mumbai",           "state": "Maharashtra",       "lat": 19.0760, "lon": 72.8777},
+    {"name": "Kolkata",          "state": "West Bengal",       "lat": 22.5726, "lon": 88.3639},
+    {"name": "Chennai",          "state": "Tamil Nadu",        "lat": 13.0827, "lon": 80.2707},
+    {"name": "Bhubaneswar",      "state": "Odisha",            "lat": 20.2961, "lon": 85.8245},
+    {"name": "Hyderabad",        "state": "Telangana",         "lat": 17.3850, "lon": 78.4867},
+    {"name": "Lucknow",          "state": "Uttar Pradesh",     "lat": 26.8467, "lon": 80.9462},
+    {"name": "Delhi",            "state": "Delhi",             "lat": 28.6139, "lon": 77.2090},
+    {"name": "Kochi",            "state": "Kerala",            "lat":  9.9312, "lon": 76.2673},
+    {"name": "Ahmedabad",        "state": "Gujarat",           "lat": 23.0225, "lon": 72.5714},
+    {"name": "Pune",             "state": "Maharashtra",       "lat": 18.5204, "lon": 73.8567},
+    {"name": "Jaipur",           "state": "Rajasthan",         "lat": 26.9124, "lon": 75.7873},
+    {"name": "Bhopal",           "state": "Madhya Pradesh",    "lat": 23.2599, "lon": 77.4126},
+    {"name": "Nagpur",           "state": "Maharashtra",       "lat": 21.1458, "lon": 79.0882},
+    {"name": "Varanasi",         "state": "Uttar Pradesh",     "lat": 25.3176, "lon": 82.9739},
+    {"name": "Visakhapatnam",    "state": "Andhra Pradesh",    "lat": 17.6868, "lon": 83.2185},
+    {"name": "Thiruvananthapuram","state": "Kerala",           "lat":  8.5241, "lon": 76.9366},
+    {"name": "Chandigarh",       "state": "Chandigarh",        "lat": 30.7333, "lon": 76.7794},
+    {"name": "Srinagar",         "state": "Jammu & Kashmir",   "lat": 34.0837, "lon": 74.7973},
 ]
+
+import time as _time
+
+_alerts_cache: dict = {"data": None, "ts": 0.0}
+_ALERTS_TTL = 300  # 5 minutes
 
 @app.get("/alerts")
 async def get_city_alerts():
-    """Live weather + river discharge for 10 major Indian flood-prone cities."""
+    """Live weather + river discharge for 10 major Indian flood-prone cities. Cached 5 min."""
+    now = _time.monotonic()
+    if _alerts_cache["data"] and now - _alerts_cache["ts"] < _ALERTS_TTL:
+        return _alerts_cache["data"]
+
     async def fetch_city(city):
         try:
-            async with httpx.AsyncClient(timeout=12.0) as c:
+            async with httpx.AsyncClient(timeout=6.0) as c:
                 weather_r, flood_r = await asyncio.gather(
                     c.get("https://api.open-meteo.com/v1/forecast", params={
                         "latitude": city["lat"], "longitude": city["lon"],
@@ -723,13 +742,91 @@ async def get_city_alerts():
             "threat":          threat,
         }
 
-    results = []
-    for i in range(0, len(ALERT_CITIES), 3):
-        batch = await asyncio.gather(*[fetch_city(c) for c in ALERT_CITIES[i:i+3]])
-        results.extend(batch)
-        if i + 3 < len(ALERT_CITIES):
-            await asyncio.sleep(0.3)
-    return {"cities": results}
+    # Fetch all 10 cities fully in parallel — no batching, no sleep
+    results = await asyncio.gather(*[fetch_city(c) for c in ALERT_CITIES])
+    payload = {"cities": list(results), "cached_at": int(_time.time())}
+    _alerts_cache["data"] = payload
+    _alerts_cache["ts"]   = now
+    return payload
+
+
+@app.get("/geocode")
+async def geocode_city(name: str, limit: int = 10):
+    """Search Indian cities via Open-Meteo geocoding API."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as c:
+            r = await c.get("https://geocoding-api.open-meteo.com/v1/search", params={
+                "name": name, "count": 20, "language": "en", "format": "json",
+            })
+        results = r.json().get("results", []) if r.status_code == 200 else []
+    except Exception:
+        results = []
+
+    india = [r for r in results if r.get("country_code") == "IN"]
+    return {"cities": [
+        {
+            "name":  r["name"],
+            "state": r.get("admin1", ""),
+            "lat":   r["latitude"],
+            "lon":   r["longitude"],
+        }
+        for r in india[:limit]
+    ]}
+
+
+@app.get("/weather/city")
+async def get_city_weather(lat: float, lon: float, name: str, state: str = ""):
+    """Fetch live weather for any lat/lon (used by Monitor page custom city search)."""
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as c:
+            weather_r, flood_r = await asyncio.gather(
+                c.get("https://api.open-meteo.com/v1/forecast", params={
+                    "latitude": lat, "longitude": lon,
+                    "current": "precipitation,relative_humidity_2m,temperature_2m,weather_code",
+                    "daily": "precipitation_sum",
+                    "past_days": 1, "forecast_days": 1,
+                    "timezone": "Asia/Kolkata",
+                }),
+                c.get("https://flood-api.open-meteo.com/v1/flood", params={
+                    "latitude": lat, "longitude": lon,
+                    "daily": "river_discharge",
+                    "past_days": 1, "forecast_days": 1,
+                }),
+            )
+            weather_data = weather_r.json() if weather_r.status_code == 200 else {}
+            flood_data   = flood_r.json()   if flood_r.status_code == 200   else {}
+    except Exception:
+        weather_data, flood_data = {}, {}
+
+    current    = weather_data.get("current", {})
+    daily      = weather_data.get("daily", {})
+    rain_today = daily.get("precipitation_sum") or [0, 0]
+    rainfall   = round(sum(v for v in rain_today if v is not None), 1)
+
+    discharge_list  = [v for v in flood_data.get("daily", {}).get("river_discharge", []) if v is not None]
+    river_discharge = round(float(discharge_list[-1]), 1) if discharge_list else None
+
+    code     = current.get("weather_code", 0)
+    humidity = current.get("relative_humidity_2m", 0) or 0
+
+    if rainfall > 100 or (river_discharge and river_discharge > 5000):
+        threat = "Extreme"
+    elif rainfall > 50 or humidity > 85:
+        threat = "High"
+    elif rainfall > 15 or humidity > 70:
+        threat = "Moderate"
+    else:
+        threat = "Low"
+
+    return {
+        "name": name, "state": state, "lat": lat, "lon": lon,
+        "rainfall_mm":     rainfall,
+        "humidity":        round(humidity),
+        "temperature":     round(current.get("temperature_2m", 0) or 0, 1),
+        "river_discharge": river_discharge,
+        "condition":       _weather_code_to_condition(code),
+        "threat":          threat,
+    }
 
 
 @app.get("/model-info")
